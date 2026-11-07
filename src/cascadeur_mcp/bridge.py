@@ -34,12 +34,23 @@ class Bridge:
 
     def status(self):
         path = self.directory / "status.json"
-        try:
-            value = json.loads(path.read_text())
-        except (OSError, ValueError) as exc:
-            raise BridgeError(
-                "Cascadeur bridge is not connected. Run the generated start_bridge.py in Cascadeur Python Console."
-            ) from exc
+        # The app replaces status.json atomically every heartbeat; on Windows a read that races
+        # the replace fails with PermissionError (or sees a partial file). Retry briefly before
+        # declaring the bridge disconnected.
+        for attempt in range(5):
+            try:
+                value = json.loads(path.read_text())
+                break
+            except FileNotFoundError as exc:
+                raise BridgeError(
+                    "Cascadeur bridge is not connected. Run the generated start_bridge.py in Cascadeur Python Console."
+                ) from exc
+            except (OSError, ValueError) as exc:
+                if attempt == 4:
+                    raise BridgeError(
+                        "Cascadeur bridge is not connected. Run the generated start_bridge.py in Cascadeur Python Console."
+                    ) from exc
+                time.sleep(0.05)
         if value.get("protocol") != 1:
             raise BridgeError("Incompatible app bridge protocol. Update the bridge.")
         if time.time() - value.get("heartbeat", 0) > 10:

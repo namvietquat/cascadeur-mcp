@@ -343,6 +343,90 @@ def create_server(bridge: Bridge):
             raise ToolError(str(exc)) from exc
 
     @server.tool(annotations=edit)
+    async def cascadeur_render_sheet(
+        directory: str,
+        target: str,
+        frames: Annotated[list[Frame], Field(min_length=1, max_length=12)],
+        views: list[Literal["left", "right", "front", "back", "three_quarter"]]
+        | None = None,
+        distance: Annotated[float, Field(gt=0)] = 450.0,
+        height_offset: float = 0.0,
+        forward: Literal["+x", "-x", "+z", "-z"] = "+z",
+        prefix: str = "sheet",
+        width: Annotated[int, Field(ge=64, le=1920)] = 640,
+        height: Annotated[int, Field(ge=64, le=1080)] = 360,
+        return_images: Annotated[int, Field(ge=0, le=8)] = 0,
+    ) -> list[TextContent | ImageContent]:
+        """Contact sheet: render each frame from several fixed angles that follow `target` (e.g. the pelvis point).
+        Files go to `directory` (workspace) as <prefix>_f<frame>_<view>.png; overwrites them. Restores the frame and
+        camera afterwards. Y-up scenes; `forward` is the character's facing axis; distance in scene units (Manny: 450).
+        Multi-angle sheets catch defects numbers miss (hands in torso, chicken-wing elbows, toes in the floor)."""
+        views = views or ["left", "front"]
+        out_dir = Path(directory).expanduser().resolve()
+        if not out_dir.is_absolute() or not out_dir.is_relative_to(bridge.workspace):
+            raise ToolError("Use an absolute directory inside the workspace.")
+        out_dir.mkdir(parents=True, exist_ok=True)
+        sign = -1.0 if forward.startswith("-") else 1.0
+        fwd = [sign, 0.0, 0.0] if forward.endswith("x") else [0.0, 0.0, sign]
+        left = [fwd[2], 0.0, -fwd[0]]  # Y-up: left = up x forward
+        dirs = {
+            "front": fwd,
+            "back": [-v for v in fwd],
+            "left": left,
+            "right": [-v for v in left],
+            "three_quarter": [(a + b) * 0.7071 for a, b in zip(fwd, left, strict=True)],
+        }
+        state = await call("get_state")
+        camera = await call("get_camera")
+        out: list[TextContent | ImageContent] = []
+        files = []
+        try:
+            for frame in frames:
+                await call("set_frame", frame=frame)
+                sample = await call(
+                    "sample_motion", objects=[target], first=frame, last=frame, step=1
+                )
+                pos = sample["objects"][0]["positions"][0]
+                aim = [pos[0], pos[1] + height_offset, pos[2]]
+                for view in views:
+                    d = dirs[view]
+                    cam = [aim[i] + d[i] * distance for i in range(3)]
+                    await call("set_camera", position=cam, target=aim)
+                    path = str(out_dir / f"{prefix}_f{int(frame):03d}_{view}.png")
+                    previous = bridge.file_stamp(path)
+                    await call(
+                        "capture_viewport",
+                        path=path,
+                        width=width,
+                        height=height,
+                        overwrite=True,
+                    )
+                    files.append(await bridge.wait_file(path, previous_stamp=previous))
+        except (BridgeError, OSError) as exc:
+            raise ToolError(str(exc)) from exc
+        finally:
+            try:
+                await call("set_frame", frame=state["frame"])
+                if camera.get("position") and camera.get("target"):
+                    await call(
+                        "set_camera",
+                        position=camera["position"],
+                        target=camera["target"],
+                    )
+            except ToolError:
+                pass
+        out.append(TextContent(type="text", text="\n".join(str(f) for f in files)))
+        for f in files[:return_images]:
+            out.append(
+                ImageContent(
+                    type="image",
+                    mimeType="image/png",
+                    data=base64.b64encode(f.read_bytes()).decode(),
+                )
+            )
+        return out
+
+    @server.tool(annotations=edit)
     async def cascadeur_import_fbx(
         path: str, mode: Literal["scene", "animation", "model"] = "scene"
     ) -> dict:
@@ -392,7 +476,10 @@ def create_server(bridge: Bridge):
 
     # -- AI-animator extensions (see extensions.py) ---------------------------
     write_file = ToolAnnotations(
-        readOnlyHint=False, destructiveHint=False, idempotentHint=True, openWorldHint=False
+        readOnlyHint=False,
+        destructiveHint=False,
+        idempotentHint=True,
+        openWorldHint=False,
     )
 
     @server.tool(annotations=read)
@@ -418,7 +505,13 @@ def create_server(bridge: Bridge):
     ) -> dict:
         """Like sample_motion but writes the full trajectories to a workspace JSON file and returns only a summary. Use for evaluator input."""
         return await call(
-            "sample_motion_to_file", objects=objects, first=first, last=last, path=path, step=step, overwrite=overwrite
+            "sample_motion_to_file",
+            objects=objects,
+            first=first,
+            last=last,
+            path=path,
+            step=step,
+            overwrite=overwrite,
         )
 
     @server.tool(annotations=read)
@@ -430,7 +523,14 @@ def create_server(bridge: Bridge):
         overwrite: bool = False,
     ) -> dict:
         """Trajectory of the rig's physics Center of Mass object (true CoM, not a pelvis proxy). Optional workspace JSON output."""
-        return await call("center_of_mass", first=first, last=last, step=step, path=path, overwrite=overwrite)
+        return await call(
+            "center_of_mass",
+            first=first,
+            last=last,
+            step=step,
+            path=path,
+            overwrite=overwrite,
+        )
 
     @server.tool(annotations=read)
     async def cascadeur_contacts(first: Frame, last: Frame) -> dict:
@@ -446,7 +546,14 @@ def create_server(bridge: Bridge):
         last: Frame = 0,
     ) -> dict:
         """AutoPosingTool.add/update(session). Measured in 2026.2.3: from a script both return ok but move nothing (AutoPosing reacts to interactive dragging). Pass `watch` to measure; trust `changed`, not `modify_ok`."""
-        return await call("autoposing", expected_scene=expected_scene, op=op, watch=watch or [], first=first, last=last)
+        return await call(
+            "autoposing",
+            expected_scene=expected_scene,
+            op=op,
+            watch=watch or [],
+            first=first,
+            last=last,
+        )
 
     @server.tool(annotations=edit)
     async def cascadeur_inbetweening(enabled: bool | None = None) -> dict:
@@ -468,8 +575,15 @@ def create_server(bridge: Bridge):
         if bool(name) == bool(action_id):
             raise ToolError("Give exactly one of name or action_id.")
         return await call(
-            "run_action_verified", expected_scene=expected_scene, watch=watch, first=first, last=last,
-            name=name, action_id=action_id, step=step, tolerance=tolerance,
+            "run_action_verified",
+            expected_scene=expected_scene,
+            watch=watch,
+            first=first,
+            last=last,
+            name=name,
+            action_id=action_id,
+            step=step,
+            tolerance=tolerance,
         )
 
     if bridge.allow_scripts:

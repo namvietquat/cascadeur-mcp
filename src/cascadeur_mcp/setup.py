@@ -15,7 +15,13 @@ def generate(output, bridge_dir, workspace, allow_scripts=False):
     output.mkdir(parents=True, exist_ok=True)
     package = output / "app" / "cascadeur_mcp"
     package.mkdir(parents=True, exist_ok=True)
-    for name in ("__init__.py", "app_bridge.py", "operations.py", "actions.py", "extensions.py"):
+    for name in (
+        "__init__.py",
+        "app_bridge.py",
+        "operations.py",
+        "actions.py",
+        "extensions.py",
+    ):
         shutil.copyfile(Path(__file__).with_name(name), package / name)
     startup = (
         "# Execute this file in Cascadeur Window > Python Console.\n"
