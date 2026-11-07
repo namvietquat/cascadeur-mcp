@@ -115,3 +115,15 @@ For edits, use `scene.modify_update(label, callback)`. Resolve and validate obje
 - Save a new `.casc`, reopen it, and compare a representative animated frame.
 - Export FBX only when allowed by the app license. Check it in the receiving application before describing export compatibility as verified.
 - Report what was tested, what was merely discovered, and what remains uncertain. Windows, Linux, Claude and Cursor client UIs were not live-tested in this release.
+
+## AI-animator extensions (branch `ai-animator-extensions`)
+
+Five tools added on top of the 36 core tools, implemented app-side in `extensions.py`. They were live-tested on Windows with Cascadeur 2026.2.3 (free licence) and the UE5 Manny sample.
+
+- `cascadeur_health`: licence flags (`export_available`, `pro_features_available`) and the active scene. Call it before promising an FBX export.
+- `cascadeur_animate_from_file(path)`: applies an `animate_transforms` payload stored as workspace JSON (`{"arguments": {"keyframes": [...]}}` or `{"keyframes": [...]}`), up to 5000 keyframes. Use it for generated plans: thousands of transforms should not travel through the model context. One undo step per 500 keyframes.
+- `cascadeur_sample_motion_to_file(objects, first, last, path)`: full trajectories go to a JSON file in the workspace, and only a summary is returned.
+- `cascadeur_center_of_mass(first, last)`: trajectory of the rig's physics **Center of Mass** object. Use it instead of the pelvis for balance checks.
+- `cascadeur_run_action_verified(expected_scene, watch, first, last, name | action_id)`: samples watched objects, runs a curated action or an **allowlisted** action ID (Scene.Undo/Redo/Edit mode, Timeline., View., AutoPhysicsTool., AutoPosingTool., BallisticTrajectoryTool., Copier., GhostTool., InbetweeningTool., MirrorTool., AttractorTool., TrajectoryTool., FixCollisionsTool., AnimationUnbakingTool.), samples again, and reports `changed` plus per-object displacement. Some effects are computed later by the app, so re-sample before concluding that an action did nothing.
+
+Starting the bridge without the GUI: `cascadeur.exe --run-python-code "exec(open(r'<setup>/start_bridge.py').read())"` forwards the code to the running instance and executes it there on the main thread (single-instance app). Use this to reload the bridge after regenerating the setup.

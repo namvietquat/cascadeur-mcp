@@ -390,6 +390,67 @@ def create_server(bridge: Bridge):
         """Inspect a discovered tool/editor and optional public attribute path. Exposes actual signatures for advanced scripts."""
         return await call("inspect_tool", name=name, editor=editor, path=path)
 
+    # -- AI-animator extensions (see extensions.py) ---------------------------
+    write_file = ToolAnnotations(
+        readOnlyHint=False, destructiveHint=False, idempotentHint=True, openWorldHint=False
+    )
+
+    @server.tool(annotations=read)
+    async def cascadeur_health() -> dict:
+        """Licence flags (export_available), active scene and path. Call before planning an export."""
+        return await call("health")
+
+    @server.tool(annotations=edit)
+    async def cascadeur_animate_from_file(
+        path: str, interpolation: Interpolation | None = None
+    ) -> dict:
+        """Apply an animate_transforms payload stored as JSON in the workspace ({"arguments": {"keyframes": [...]}} or {"keyframes": [...]}). Use for large generated plans instead of passing them inline. Up to 5000 keyframes x 200 transforms."""
+        return await call("animate_from_file", path=path, interpolation=interpolation)
+
+    @server.tool(annotations=write_file)
+    async def cascadeur_sample_motion_to_file(
+        objects: Names,
+        first: Frame,
+        last: Frame,
+        path: str,
+        step: Annotated[int, Field(ge=1, le=1000)] = 1,
+        overwrite: bool = False,
+    ) -> dict:
+        """Like sample_motion but writes the full trajectories to a workspace JSON file and returns only a summary. Use for evaluator input."""
+        return await call(
+            "sample_motion_to_file", objects=objects, first=first, last=last, path=path, step=step, overwrite=overwrite
+        )
+
+    @server.tool(annotations=read)
+    async def cascadeur_center_of_mass(
+        first: Frame,
+        last: Frame,
+        step: Annotated[int, Field(ge=1, le=1000)] = 1,
+        path: str | None = None,
+        overwrite: bool = False,
+    ) -> dict:
+        """Trajectory of the rig's physics Center of Mass object (true CoM, not a pelvis proxy). Optional workspace JSON output."""
+        return await call("center_of_mass", first=first, last=last, step=step, path=path, overwrite=overwrite)
+
+    @server.tool(annotations=edit)
+    async def cascadeur_run_action_verified(
+        expected_scene: str,
+        watch: Names,
+        first: Frame,
+        last: Frame,
+        name: str | None = None,
+        action_id: str | None = None,
+        step: Annotated[int, Field(ge=1, le=1000)] = 1,
+        tolerance: Annotated[float, Field(ge=0)] = 1e-4,
+    ) -> dict:
+        """Run a curated action (name from list_actions) or an allowlisted Cascadeur action ID, measuring watched objects before/after. Returns changed + per-object displacement. Deferred app solving may need a later re-sample."""
+        if bool(name) == bool(action_id):
+            raise ToolError("Give exactly one of name or action_id.")
+        return await call(
+            "run_action_verified", expected_scene=expected_scene, watch=watch, first=first, last=last,
+            name=name, action_id=action_id, step=step, tolerance=tolerance,
+        )
+
     if bridge.allow_scripts:
 
         @server.tool(

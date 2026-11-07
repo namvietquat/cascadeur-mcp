@@ -755,4 +755,6 @@ def dispatch(method, p, bridge_state):
             action=item["id"],
             verification="Action API has no completion/result signal. Inspect event log, poses and preview before claiming success or retrying.",
         )
-    raise ValueError("Unknown bridge operation: " + method)
+    from .extensions import dispatch_ext
+
+    return dispatch_ext(method, p, bridge_state, dispatch)
