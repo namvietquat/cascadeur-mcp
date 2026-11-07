@@ -19,7 +19,7 @@ ACTION_PREFIXES = (
     "Scene.Undo", "Scene.Redo", "Scene.Edit mode.", "Scene.Set key on change",
     "Timeline.", "View.", "AutoPhysicsTool.", "AutoPosingTool.", "BallisticTrajectoryTool.",
     "Copier.", "GhostTool.", "InbetweeningTool.", "MirrorTool.", "AttractorTool.",
-    "TrajectoryTool.", "FixCollisionsTool.", "AnimationUnbakingTool.",
+    "TrajectoryTool.", "FixCollisionsTool.", "AnimationUnbakingTool.", "TweenMachine.", "Visible.AutoPhysics",
 )
 MAX_FILE_KEYFRAMES = 5000
 
@@ -100,6 +100,83 @@ def dispatch_ext(method, p, state, dispatch):
                     note=("Measured before/after positions in the same bridge tick. Effects computed later by "
                           "the app (idle/physics solving) appear only on a later sample: re-sample before concluding "
                           "it did nothing."))
+
+    if method == "contacts":
+        # Cascadeur's own physics view of ground contact (same API as the bundled
+        # ml/editable_animation.py): fulcrum = planted support point, touch = touching,
+        # collision info carries penetration depth. Read-only.
+        import csc
+
+        _, _, view, scene = context()
+        first, last = frame_number(p["first"]), frame_number(p["last"])
+        if last < first or last - first > 2000:
+            raise ValueError("Expected 0..2000 frames.")
+        bv = scene.behaviour_viewer()
+        cms = bv.get_behaviours("CenterOfMass")
+        if not cms:
+            raise ValueError("No CenterOfMass behaviour: the rig has no physics model.")
+        rbs = bv.get_behaviour_reference_range(cms[0], "rigid_bodies")
+        info = csc.tools.FulcrumCollisionInfo(first, last, scene, csc.tools.StaticPointsTypes(scene, rbs))
+        mv = scene.model_viewer()
+        names = {}
+
+        def nm(oid):
+            if oid not in names:
+                names[oid] = mv.get_object_name(oid)
+            return names[oid]
+
+        def per_object(frames_to_ids):
+            out = {}
+            for f, ids in frames_to_ids.items():
+                for oid in ids:
+                    out.setdefault(nm(oid), []).append(int(f))
+            return {k: sorted(v) for k, v in sorted(out.items())}
+
+        res = dict(first=first, last=last, fulcrum=per_object(info.get_fulcrum_points()),
+                   touch=per_object(info.get_touch_points()), collision=per_object(info.get_collision_points()))
+        deepest = {}
+        for f, objs in info.get_frame_collision_info_points().items():
+            for oid, ci in objs.items():
+                d = ci.penetration_depth
+                d = float(d() if callable(d) else d)
+                if d > deepest.get(nm(oid), (0.0, None))[0]:
+                    deepest[nm(oid)] = (d, int(f))
+        res["max_penetration"] = {k: dict(depth=round(v[0], 4), frame=v[1]) for k, v in sorted(deepest.items())}
+        res["note"] = "Contacts as Cascadeur's physics sees them; compare with your evaluator's height-based contacts."
+        return res
+
+    if method == "autoposing":
+        # AutoPosingTool.add/update(session) as used by the bundled rig_mode/off.py.
+        # Measured before/after: earlier experience (Cascadeur 2026.1) saw update() change nothing.
+        import csc
+
+        _, _, view, scene = context()
+        if p["expected_scene"] != view.name():
+            raise ValueError("Active scene changed; inspect before editing.")
+        op = p["op"]
+        if op not in ("add", "update"):
+            raise ValueError("op must be 'add' or 'update'.")
+        tool = csc.app.get_application().get_tools_manager().get_tool("AutoPosingTool").editor(view)
+        watch = p.get("watch") or []
+        frame = scene.get_current_frame()
+        before = _sample(dispatch, state, watch, p["first"], p["last"]) if watch else None
+        ok = scene.modify_with_session("MCP AutoPosing " + op,
+                                       lambda model, update, sc, session: getattr(tool, op)(session))
+        out = dict(op=op, modify_ok=bool(ok), frame=frame)
+        if watch:
+            diff = _displacement(before, _sample(dispatch, state, watch, p["first"], p["last"]))
+            out.update(changed=any(v["max_change"] > 1e-4 for v in diff.values()), displacement=diff)
+        return out
+
+    if method == "inbetweening":
+        import csc
+
+        _, _, view, _ = context()
+        tool = csc.app.get_application().get_tools_manager().get_tool("InbetweeningTool").editor(view)
+        if p.get("enabled") is not None:
+            tool.set_update_parameter(bool(p["enabled"]))
+        return dict(update_enabled=bool(tool.get_update_parameter()),
+                    note="Keys with interpolation 'AI' are inbetweened by Cascadeur's model when enabled.")
 
     if method == "health":
         import csc

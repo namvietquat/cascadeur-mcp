@@ -432,6 +432,27 @@ def create_server(bridge: Bridge):
         """Trajectory of the rig's physics Center of Mass object (true CoM, not a pelvis proxy). Optional workspace JSON output."""
         return await call("center_of_mass", first=first, last=last, step=step, path=path, overwrite=overwrite)
 
+    @server.tool(annotations=read)
+    async def cascadeur_contacts(first: Frame, last: Frame) -> dict:
+        """Cascadeur's own physics contacts per point: fulcrum (planted support), touch, collision frames and max penetration depth. Depths include each point's collision radius; compare against the shallowest (flat planted) value. Needs a rig with a physics model."""
+        return await call("contacts", first=first, last=last)
+
+    @server.tool(annotations=edit)
+    async def cascadeur_autoposing(
+        expected_scene: str,
+        op: Literal["add", "update"],
+        watch: Names | None = None,
+        first: Frame = 0,
+        last: Frame = 0,
+    ) -> dict:
+        """AutoPosingTool.add/update(session). Measured in 2026.2.3: from a script both return ok but move nothing (AutoPosing reacts to interactive dragging). Pass `watch` to measure; trust `changed`, not `modify_ok`."""
+        return await call("autoposing", expected_scene=expected_scene, op=op, watch=watch or [], first=first, last=last)
+
+    @server.tool(annotations=edit)
+    async def cascadeur_inbetweening(enabled: bool | None = None) -> dict:
+        """Read or set InbetweeningTool's update flag (AI inbetweening of keys whose interpolation is 'AI')."""
+        return await call("inbetweening", enabled=enabled)
+
     @server.tool(annotations=edit)
     async def cascadeur_run_action_verified(
         expected_scene: str,

@@ -2,7 +2,7 @@
 
 An independent local MCP server for controlling Cascadeur from **Codex, Claude Desktop, Claude Code, Cursor**, and other stdio MCP clients.
 
-It provides **41 named tools** (36 core + 5 AI-animator extensions: health, animate-from-file, sample-to-file, center of mass, verified actions) for scene and rig inspection, body/finger posing, keyframes, interpolation, timeline selection, camera controls, PNG previews and FBX import/export. A curated action catalog exposes physics, AutoPosing, retargeting, cycles and review commands with explicit verification limits. An optional 42nd tool enables advanced Python scripting.
+It provides **44 named tools** (36 core + 8 AI-animator extensions: health, animate-from-file, sample-to-file, center of mass, verified actions, physics contacts, AutoPosing probe, AI inbetweening flag) for scene and rig inspection, body/finger posing, keyframes, interpolation, timeline selection, camera controls, PNG previews and FBX import/export. A curated action catalog exposes physics, AutoPosing, retargeting, cycles and review commands with explicit verification limits. An optional 45th tool enables advanced Python scripting.
 
 **Start with the [AI operating guide](docs/AI_GUIDE.md).** It explains which controls to use, how to verify body and finger animation, and which APIs to avoid. The guide is also served to agents as `cascadeur://guide`.
 

@@ -76,3 +76,46 @@ group(
         "show_physics_settings": "Window.Physics settings",
     },
 )
+
+
+# Added from the official action ID reference (https://cascadeur.com/help/category/301).
+group(
+    "cycles",
+    {
+        "create_cycle_with_position_offset": "Timeline.Create cycle with position offset",
+        "resize_cycles": "Timeline.Resize cycles",
+    },
+)
+group(
+    "interval",
+    {
+        "fulcrum_key_on_interval": "Timeline.Change to fulcrum key on interval",
+        "clear_custom_tangents_on_interval": "Timeline.Clear custom tangents on selected interval",
+        "inbetween_interpolation_switch": "Scene.Inbetween interpolation switcher",
+        "autoposing_lock_on_interval": "AutoPosingTool.SwitchLockOnInterval",
+    },
+)
+group(
+    "mirror",
+    {
+        "mirror_pelvis_position": "MirrorTool.Mirror pelvis position",
+        "mirror_plane_yz": "MirrorTool.Planes.YZ",
+    },
+)
+group(
+    "tween",
+    {
+        "tween_to_previous": "TweenMachine.Attract to previous position.Selected frames",
+        "tween_to_next": "TweenMachine.Attract to next position.Selected frames",
+        "tween_to_interpolation": "TweenMachine.Attract to interpolation position.Selected frames",
+        "tween_to_average": "TweenMachine.Attract to average position.Selected frames",
+        "tween_inertial": "TweenMachine.Attract to inertial position.Selected frames",
+    },
+)
+group(
+    "ballistic",
+    {
+        "ballistic_fix_rotation_frame": "BallisticTrajectoryTool.Set fixation frame for free rotation",
+        "ballistic_snap_orientation": "BallisticTrajectoryTool.Snap orientation to the ghosts of free rotation",
+    },
+)
