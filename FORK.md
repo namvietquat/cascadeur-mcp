@@ -25,6 +25,24 @@ Curated actions: 46 -> 61 (cycles, interval fulcrum/tangents, mirror, Tween Mach
 - Windows: symlink test is skipped where symlinks need admin rights.
 - Lint: extensions are ruff-clean (CI runs `ruff check` + pytest on 3.11-3.13).
 
+## Which actions really work from a script (measured 2026-11-07, Cascadeur 2026.2.3, free licence)
+Probe: `ai_animator.probe_actions` on a copy of a 22-frame run (all Points + frames 3-8 selected),
+`run_action_verified` before/after, re-sampled after 2 s and 10 s, then undo (all restored).
+
+| Action | Effect from script | Measured gain on walk / run (evaluator + Cascadeur contacts) |
+|---|---|---|
+| `View.FixFoot` | yes (feet up to 1.5 cm) | run: toe penetration 0.0109 -> 0.0009 L, smoother; walk: re-crouches stance knee (score 90 -> 75). Accept only if the score holds. |
+| `TweenMachine.Attract to {interpolation,average,inertial,previous,next} position.{Selected frames,Current frame}` | yes (0.5-2.5 cm) | interpolation/average: max accel -4 % (walk), -13 % (run), no new issues; previous/next pull poses, not a smoother |
+| `View.Animation unbaking` | yes (3.3 cm) | changes keys/interpolation; not evaluated as a polish |
+| `View.FixFoot_KeepKeyFrames` | no change on a keyed-every-frame clip | - |
+| `AutoPhysicsTool.Switch Auto Physics` / `Set priority frame` / `Switch Frozen Auto Physics` | **no change** (even after 10 s) | - |
+| `AutoPhysicsTool.Snap to Auto Physics` | error "No working Autophysics" | - |
+| `BallisticTrajectoryTool.Add ballistic trajectory` | no change | - |
+| `View.AutoInterpolation_Interpolations`, `Timeline.Create cycle` | no change on this clip | - |
+| `AutoPosingTool.add/update(session)` (API) | no change | - |
+
+AutoPhysics and AutoPosing appear to need the interactive UI; they are not usable headless here.
+
 ## Rules kept
 - Never work around the licence: FBX export stays licence-checked; no bulk joint dumps.
 - Scripting stays opt-in; menu actions only by curated name or prefix allowlist (no File./Window./exit/dialogs).
